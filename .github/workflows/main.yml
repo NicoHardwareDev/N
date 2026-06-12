@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Instalar herramientas
         run: |
@@ -15,17 +15,17 @@ jobs:
 
       - name: Sintetizar y Rutear
         run: |
-          # 1. Convierte tu Verilog a un diseño funcional (JSON)
+          # 1. Convierte tu Verilog a JSON
           yosys -p "read_verilog procesador_final.v; synth_xilinx -flatten -abc9 -arch xc7; write_json hardware.json"
           
-          # 2. Hace el ruteo usando el chipdb nativo del servidor y tu archivo .xdc
+          # 2. Ruteo con el chipdb del servidor
           nextpnr-xilinx --chipdb /usr/share/f4pga/xc7a35t.bin --json hardware.json --xdc constraints.xdc --write hardware_out.json --device xc7a35tcsg324-1
           
-          # 3. Genera el bitstream binario final para tu placa Cmod A7
+          # 3. Genera el bitstream final para tu placa
           prjxray-bitstream --fasm hardware_out.json --bit hardware.bit
           
       - name: Subir el resultado
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: bitstream
           path: hardware.bit

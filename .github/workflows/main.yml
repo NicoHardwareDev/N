@@ -1,0 +1,31 @@
+name: FPGA Build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Instalar herramientas
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yosys nextpnr-xilinx prjxray
+
+      - name: Sintetizar y Rutear
+        run: |
+          # 1. Convierte tu Verilog a un diseño funcional (JSON)
+          yosys -p "read_verilog procesador_final.v; synth_xilinx -flatten -abc9 -arch xc7; write_json hardware.json"
+          
+          # 2. Hace el ruteo usando el chipdb nativo del servidor y tu archivo .xdc
+          nextpnr-xilinx --chipdb /usr/share/f4pga/xc7a35t.bin --json hardware.json --xdc constraints.xdc --write hardware_out.json --device xc7a35tcsg324-1
+          
+          # 3. Genera el bitstream binario final para tu placa Cmod A7
+          prjxray-bitstream --fasm hardware_out.json --bit hardware.bit
+          
+      - name: Subir el resultado
+        uses: actions/upload-artifact@v3
+        with:
+          name: bitstream
+          path: hardware.bit

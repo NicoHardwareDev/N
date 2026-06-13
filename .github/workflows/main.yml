@@ -10,22 +10,26 @@ jobs:
 
       - name: Descargar e Instalar OSS CAD Suite
         run: |
-          # Descarga directa de la suite oficial
+          # 1. Descargamos la suite oficial de YosysHQ
           export SUITE_URL=$(curl -s https://api.github.com/repos/YosysHQ/oss-cad-suite-build/releases/latest | grep "browser_download_url.*linux-x64" | head -n 1 | cut -d '"' -f 4)
           echo "Descargando desde: $SUITE_URL"
           curl -L -o oss-cad-suite.tgz "$SUITE_URL"
-          tar -xzf oss-cad-suite.tgz
+          
+          # 2. Descomprimimos directamente en el directorio raíz del espacio de trabajo
+          mkdir -p $GITHUB_WORKSPACE/oss-cad-suite
+          tar -xzf oss-cad-suite.tgz -C $GITHUB_WORKSPACE/oss-cad-suite --strip-components=1
 
       - name: Sintetizar y Rutear
         run: |
-          # 1. Convierte tu Verilog a JSON usando la ruta directa a yosys
-          $GITHUB_WORKSPACE/oss-cad-suite/bin/yosys -p "read_verilog procesador_final.v; synth_xilinx -flatten -abc9 -arch xc7; write_json hardware.json"
+          # 3. Activamos el entorno usando el script de inicialización oficial de la suite
+          source $GITHUB_WORKSPACE/oss-cad-suite/environment
           
-          # 2. Hace el ruteo usando la ruta directa a nextpnr-xilinx y su chipdb interno
-          $GITHUB_WORKSPACE/oss-cad-suite/bin/nextpnr-xilinx --chipdb $GITHUB_WORKSPACE/oss-cad-suite/share/nextpnr/xilinx-chipdb/xc7a35t.bin --json hardware.json --xdc constraints.xdc --write hardware_out.json --device xc7a35tcsg324-1
+          # 4. Ahora sí, corremos los comandos nativos sin rutas manuales rotas
+          yosys -p "read_verilog procesador_final.v; synth_xilinx -flatten -abc9 -arch xc7; write_json hardware.json"
           
-          # 3. Genera el bitstream final llamando directo a prjxray-bitstream
-          $GITHUB_WORKSPACE/oss-cad-suite/bin/prjxray-bitstream --fasm hardware_out.json --bit hardware.bit
+          nextpnr-xilinx --chipdb $GITHUB_WORKSPACE/oss-cad-suite/share/nextpnr/xilinx-chipdb/xc7a35t.bin --json hardware.json --xdc constraints.xdc --write hardware_out.json --device xc7a35tcsg324-1
+          
+          prjxray-bitstream --fasm hardware_out.json --bit hardware.bit
           
       - name: Subir el resultado
         uses: actions/upload-artifact@v4

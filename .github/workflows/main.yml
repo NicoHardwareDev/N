@@ -10,25 +10,22 @@ jobs:
 
       - name: Descargar e Instalar OSS CAD Suite
         run: |
-          # Descargamos la última versión estable directamente de YosysHQ
+          # Descarga directa de la suite oficial
           export SUITE_URL=$(curl -s https://api.github.com/repos/YosysHQ/oss-cad-suite-build/releases/latest | grep "browser_download_url.*linux-x64" | head -n 1 | cut -d '"' -f 4)
           echo "Descargando desde: $SUITE_URL"
           curl -L -o oss-cad-suite.tgz "$SUITE_URL"
           tar -xzf oss-cad-suite.tgz
-          
-          # Agregamos las herramientas al PATH del sistema temporal de GitHub
-          echo "$GITHUB_WORKSPACE/oss-cad-suite/bin" >> $GITHUB_PATH
 
       - name: Sintetizar y Rutear
         run: |
-          # 1. Convierte tu Verilog a JSON
-          yosys -p "read_verilog procesador_final.v; synth_xilinx -flatten -abc9 -arch xc7; write_json hardware.json"
+          # 1. Convierte tu Verilog a JSON usando la ruta directa a yosys
+          $GITHUB_WORKSPACE/oss-cad-suite/bin/yosys -p "read_verilog procesador_final.v; synth_xilinx -flatten -abc9 -arch xc7; write_json hardware.json"
           
-          # 2. Hace el ruteo usando el chipdb integrado dentro de la suite descargada
-          nextpnr-xilinx --chipdb $GITHUB_WORKSPACE/oss-cad-suite/share/nextpnr/xilinx-chipdb/xc7a35t.bin --json hardware.json --xdc constraints.xdc --write hardware_out.json --device xc7a35tcsg324-1
+          # 2. Hace el ruteo usando la ruta directa a nextpnr-xilinx y su chipdb interno
+          $GITHUB_WORKSPACE/oss-cad-suite/bin/nextpnr-xilinx --chipdb $GITHUB_WORKSPACE/oss-cad-suite/share/nextpnr/xilinx-chipdb/xc7a35t.bin --json hardware.json --xdc constraints.xdc --write hardware_out.json --device xc7a35tcsg324-1
           
-          # 3. Genera el bitstream final
-          prjxray-bitstream --fasm hardware_out.json --bit hardware.bit
+          # 3. Genera el bitstream final llamando directo a prjxray-bitstream
+          $GITHUB_WORKSPACE/oss-cad-suite/bin/prjxray-bitstream --fasm hardware_out.json --bit hardware.bit
           
       - name: Subir el resultado
         uses: actions/upload-artifact@v4

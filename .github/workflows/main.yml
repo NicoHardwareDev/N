@@ -10,29 +10,21 @@ jobs:
 
       - name: Descargar e Instalar OSS CAD Suite
         run: |
-          # 1. Traer el archivo comprimido oficial
           export SUITE_URL=$(curl -s https://api.github.com/repos/YosysHQ/oss-cad-suite-build/releases/latest | grep "browser_download_url.*linux-x64" | head -n 1 | cut -d '"' -f 4)
           curl -L -o oss-cad-suite.tgz "$SUITE_URL"
-          
-          # 2. Descomprimir en una carpeta limpia
-          mkdir -p bin_tools
-          tar -xzf oss-cad-suite.tgz -C bin_tools --strip-components=1
-          
-          # 3. Forzar la ruta al entorno global de GitHub de forma segura
-          echo "$GITHUB_WORKSPACE/bin_tools/bin" >> $GITHUB_PATH
+          mkdir -p $GITHUB_WORKSPACE/oss-cad-suite
+          tar -xzf oss-cad-suite.tgz -C $GITHUB_WORKSPACE/oss-cad-suite --strip-components=1
 
       - name: Diagnóstico y Compilación
         run: |
-          # Esto nos mostrará en la terminal qué hay dentro si falla, para dejar de adivinar
-          echo "=== Contenido de bin ==="
-          ls -l $GITHUB_WORKSPACE/bin_tools/bin || true
+          # 1. Ejecutar Yosys usando su ruta absoluta
+          $GITHUB_WORKSPACE/oss-cad-suite/bin/yosys -p "read_verilog procesador_final.v; synth_xilinx -flatten -abc9 -arch xc7; write_json hardware.json"
           
-          # 4. Comandos de síntesis y ruteo directos
-          yosys -p "read_verilog procesador_final.v; synth_xilinx -flatten -abc9 -arch xc7; write_json hardware.json"
+          # 2. Ejecutar nextpnr-xilinx apuntando directo a su binario y a su chipdb interno
+          $GITHUB_WORKSPACE/oss-cad-suite/bin/nextpnr-xilinx --chipdb $GITHUB_WORKSPACE/oss-cad-suite/share/nextpnr/xilinx-chipdb/xc7a35t.bin --json hardware.json --xdc constraints.xdc --write hardware_out.json --device xc7a35tcsg324-1
           
-          nextpnr-xilinx --chipdb $GITHUB_WORKSPACE/bin_tools/share/nextpnr/xilinx-chipdb/xc7a35t.bin --json hardware.json --xdc constraints.xdc --write hardware_out.json --device xc7a35tcsg324-1
-          
-          prjxray-bitstream --fasm hardware_out.json --bit hardware.bit
+          # 3. Generar el bitstream con la ruta absoluta de prjxray
+          $GITHUB_WORKSPACE/oss-cad-suite/bin/prjxray-bitstream --fasm hardware_out.json --bit hardware.bit
           
       - name: Subir el resultado
         uses: actions/upload-artifact@v4

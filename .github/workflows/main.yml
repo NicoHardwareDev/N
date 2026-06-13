@@ -5,23 +5,19 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
+    container: hdlc/nextpnr:xilinx # <-- Esto le da al servidor TODAS las herramientas listas
     steps:
       - uses: actions/checkout@v4
-
-      - name: Instalar herramientas
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y yosys nextpnr-xilinx prjxray
 
       - name: Sintetizar y Rutear
         run: |
           # 1. Convierte tu Verilog a JSON
           yosys -p "read_verilog procesador_final.v; synth_xilinx -flatten -abc9 -arch xc7; write_json hardware.json"
           
-          # 2. Ruteo con el chipdb del servidor
-          nextpnr-xilinx --chipdb /usr/share/f4pga/xc7a35t.bin --json hardware.json --xdc constraints.xdc --write hardware_out.json --device xc7a35tcsg324-1
+          # 2. Hace el ruteo usando el chipdb integrado en el contenedor
+          nextpnr-xilinx --chipdb /usr/share/nextpnr/xilinx-chipdb/xc7a35t.bin --json hardware.json --xdc constraints.xdc --write hardware_out.json --device xc7a35tcsg324-1
           
-          # 3. Genera el bitstream final para tu placa
+          # 3. Genera el bitstream final
           prjxray-bitstream --fasm hardware_out.json --bit hardware.bit
           
       - name: Subir el resultado

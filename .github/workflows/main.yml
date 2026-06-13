@@ -8,23 +8,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Descargar e Instalar OSS CAD Suite
-        run: |
-          export SUITE_URL=$(curl -s https://api.github.com/repos/YosysHQ/oss-cad-suite-build/releases/latest | grep "browser_download_url.*linux-x64" | head -n 1 | cut -d '"' -f 4)
-          curl -L -o oss-cad-suite.tgz "$SUITE_URL"
-          mkdir -p $GITHUB_WORKSPACE/oss-cad-suite
-          tar -xzf oss-cad-suite.tgz -C $GITHUB_WORKSPACE/oss-cad-suite --strip-components=1
+      # Esta acción descarga e instala la suite de forma nativa y correcta en el sistema
+      - name: Setup OSS CAD Suite
+        uses: YosysHQ/setup-oss-cad-suite@v3
+        with:
+          version: 'latest'
 
-      - name: Diagnóstico y Compilación
+      # Ejecutamos las herramientas de forma directa usando los comandos del sistema
+      - name: Sintetizar y Rutear
         run: |
-          # 1. Ejecutar Yosys usando su ruta absoluta
-          $GITHUB_WORKSPACE/oss-cad-suite/bin/yosys -p "read_verilog procesador_final.v; synth_xilinx -flatten -abc9 -arch xc7; write_json hardware.json"
+          # 1. Sintetizar Verilog a JSON
+          yosys -p "read_verilog procesador_final.v; synth_xilinx -flatten -abc9 -arch xc7; write_json hardware.json"
           
-          # 2. Ejecutar nextpnr-xilinx apuntando directo a su binario y a su chipdb interno
-          $GITHUB_WORKSPACE/oss-cad-suite/bin/nextpnr-xilinx --chipdb $GITHUB_WORKSPACE/oss-cad-suite/share/nextpnr/xilinx-chipdb/xc7a35t.bin --json hardware.json --xdc constraints.xdc --write hardware_out.json --device xc7a35tcsg324-1
+          # 2. Ruteo (Buscamos el chipdb dinámicamente usando la ruta de la acción)
+          nextpnr-xilinx --chipdb $OSSCADSUITE_PATH/../share/nextpnr/xilinx-chipdb/xc7a35t.bin --json hardware.json --xdc constraints.xdc --write hardware_out.json --device xc7a35tcsg324-1
           
-          # 3. Generar el bitstream con la ruta absoluta de prjxray
-          $GITHUB_WORKSPACE/oss-cad-suite/bin/prjxray-bitstream --fasm hardware_out.json --bit hardware.bit
+          # 3. Generar bitstream
+          prjxray-bitstream --fasm hardware_out.json --bit hardware.bit
           
       - name: Subir el resultado
         uses: actions/upload-artifact@v4
